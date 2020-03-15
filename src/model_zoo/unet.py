@@ -1,6 +1,3 @@
-from custom_layers.scse import *
-from custom_layers.aspp import *
-
 import torch
 import numpy as np
 import torch.nn as nn
@@ -10,7 +7,6 @@ from torch.nn.functional import interpolate
 
 from model_zoo.resnet import *
 from model_zoo.custom_layers import *
-
 
 
 class Model(nn.Module):
