@@ -1,4 +1,7 @@
-from imports import *
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+from torch.autograd import Variable
 
 
 def mean(l, ignore_nan=False, empty=0):

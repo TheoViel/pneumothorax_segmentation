@@ -52,6 +52,21 @@ def mask_to_rle(img):
     return " ".join(rle)
 
 
+def lower_res(img, mask, ratio=2):
+    if type(mask) == str:
+        mask = rle_to_mask(mask, img.shape)
+
+    resize = albu.Resize(IMG_SHAPE[0] // ratio, IMG_SHAPE[1] // ratio, always_apply=True)
+    transformed = resize(image=img, mask=mask)
+
+    img = transformed['image']
+    mask = transformed['mask']
+
+    rle = mask_to_rle(mask)
+
+    return img, rle
+
+    
 def plot_mask(img, mask):
     if type(mask) == str:
         mask = rle_to_mask(mask, img.shape)

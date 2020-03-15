@@ -1,4 +1,5 @@
-from torchvision.models.resnet import *
+from torch.utils.model_zoo import load_url
+from torchvision.models.resnet import ResNet, BasicBlock
 
 
 class ResNetEncoder(ResNet):
@@ -24,3 +25,27 @@ class ResNetEncoder(ResNet):
         state_dict.pop('fc.bias')
         state_dict.pop('fc.weight')
         super().load_state_dict(state_dict, **kwargs)
+
+
+SETTINGS = {
+    "resnet34": {
+        "name": "resnet34",
+        "encoder": ResNetEncoder,
+        "pretrained_settings": "https://download.pytorch.org/models/resnet34-333f7ec4.pth",
+        "out_shapes": (512, 256, 128, 64, 64),
+        "params": {"block": BasicBlock, "layers": [3, 4, 6, 3],},
+    }
+}
+
+
+def get_encoder(settings):
+    Encoder = settings["encoder"]
+    encoder = Encoder(**settings["params"])
+    encoder.out_shapes = settings["out_shapes"]
+
+    if settings["pretrained_settings"] is not None:
+        encoder.load_state_dict(
+            load_url(settings["pretrained_settings"])
+        )
+
+    return encoder

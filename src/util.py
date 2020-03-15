@@ -1,7 +1,11 @@
-from imports import *
-from fastai.vision import *
-from params import *
+import os
+import torch
+import random
+import operator
+import numpy as np
+import pandas as pd
 
+from params import CP_PATH
 
 def seed_everything(seed):
     random.seed(seed)
@@ -50,62 +54,3 @@ def count_parameters(model, all=False):
         return sum(p.numel() for p in model.parameters())
     else:
         return sum(p.numel() for p in model.parameters() if p.requires_grad)
-
-
-def flatten_model(m): return sum(
-    map(flatten_model, children_and_parameters(m)), []) if num_children(m) else [m]
-
-
-def listify(p: OptListOrItem = None, q: OptListOrItem = None):
-    """
-    Make `p` listy and the same length as `q`.
-    """
-    if p is None:
-        p = []
-    elif isinstance(p, str):
-        p = [p]
-    elif not isinstance(p, Iterable):
-        p = [p]
-    # Rank 0 tensors in PyTorch are Iterable but don't have a length.
-    else:
-        try:
-            _ = len(p)
-        except BaseException:
-            p = [p]
-    n = q if isinstance(q, int) else len(p) if q is None else len(q)
-    if len(p) == 1:
-        p = p * n
-    assert len(p) == n, f'List len mismatch ({len(p)} vs {n})'
-    return list(p)
-
-
-def first_layer(m: nn.Module)->nn.Module:
-    """"
-    Retrieve first layer in a module `m`.
-    """
-    return flatten_model(m)[0]
-
-
-def split_model_idx(model: nn.Module, idxs: Collection[int])->ModuleList:
-    """
-    Split `model` according to the indexes in `idxs`.
-    """
-    layers = flatten_model(model)
-    if idxs[0] != 0:
-        idxs = [0] + idxs
-    if idxs[-1] != len(layers):
-        idxs.append(len(layers))
-    return [nn.Sequential(*layers[i:j]) for i, j in zip(idxs[:-1], idxs[1:])]
-
-
-def split_model(model: nn.Module = None,
-                splits: Collection[Union[nn.Module, ModuleList]] = None):
-    """
-    Split `model` according to the layers in `splits`.
-    """
-    splits = listify(splits)
-    if isinstance(splits[0], nn.Module):
-        layers = flatten_model(model)
-        idxs = [layers.index(first_layer(s)) for s in splits]
-        return split_model_idx(model, idxs)
-    return [nn.Sequential(*s) for s in splits]

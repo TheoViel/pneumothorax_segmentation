@@ -1,7 +1,29 @@
-from imports import *
-from model_zoo.common import *
 from custom_layers.scse import *
 from custom_layers.aspp import *
+
+import torch
+import numpy as np
+import torch.nn as nn
+import torch.nn.functional as F
+from torchvision.models.resnet import *
+from torch.nn.functional import interpolate
+
+from model_zoo.resnet import *
+from model_zoo.custom_layers import *
+
+
+
+class Model(nn.Module):
+    def __init__(self):
+        super().__init__()
+
+    def initialize(self):
+        for m in self.modules():
+            if isinstance(m, nn.Conv2d):
+                nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
+            elif isinstance(m, nn.BatchNorm2d):
+                nn.init.constant_(m.weight, 1)
+                nn.init.constant_(m.bias, 0)
 
 
 class Conv2dReLU(nn.Module):
@@ -54,10 +76,11 @@ class CenterBlock(DecoderBlock):
 
 class UnetDecoder(Model):
     def __init__(self, encoder_channels, decoder_channels=(64, 64, 64, 64), final_channels=1,
-                 use_batchnorm=True, attention_type=None):
+                 use_batchnorm=True, attention_type=None, use_hypercolumns=False):
         super().__init__()
+        self.use_hypercolumns = use_hypercolumns
 
-        in_channels = self.compute_channels(encoder_channels, decoder_channels)
+        in_channels = self.compute_channels(encoder_channels, decoder_channels, use_hypercolumns)
         out_channels = decoder_channels
 
         self.layer1 = DecoderBlock(in_channels[0], out_channels[0], use_batchnorm=use_batchnorm,
@@ -85,18 +108,30 @@ class UnetDecoder(Model):
         self.initialize()
 
     @staticmethod
-    def compute_channels(encoder_channels, decoder_channels):
-        channels = [
-            encoder_channels[0] + encoder_channels[1],
-            encoder_channels[2] + decoder_channels[0],
-            encoder_channels[3] + decoder_channels[1],
-            encoder_channels[4] + decoder_channels[2],
-        ]
+    def compute_channels(encoder_channels, decoder_channels, use_hypercolumns=False):
+        if use_hypercolumns:
+            channels = [
+                encoder_channels[0] + encoder_channels[1],
+                encoder_channels[2] + decoder_channels[0],
+                encoder_channels[3] + decoder_channels[1],
+                encoder_channels[4] + decoder_channels[2],
+            ]
+        else: 
+            channels = [
+                encoder_channels[0],
+                decoder_channels[0],
+                decoder_channels[1],
+                decoder_channels[2],
+            ]
         return channels
-
+ 
     def forward(self, x):
         encoder_head = x[0]
-        skips = x[1:]
+
+        if self.use_hypercolumns:
+            skips = x[1:]
+        else:
+            skips = [None, None, None, None]
 
         x1 = self.layer1([encoder_head, skips[0]])
         x2 = self.layer2([x1, skips[1]])
@@ -119,7 +154,7 @@ class UnetDecoder(Model):
 
 class SegmentationUnet(Model):
     def __init__(self, encoder_settings, num_classes=1, center_block=None, aux_clf=False, softmax=False,
-                 use_bn=True, attention_type=None):
+                 use_bn=True, attention_type=None, use_hypercolumns=True):
         super().__init__()
         self.aux_clf = aux_clf
         self.num_classes = num_classes
@@ -136,7 +171,7 @@ class SegmentationUnet(Model):
             self.center = None
 
         self.decoder = UnetDecoder(encoder_channels=encoder_chanels, final_channels=num_classes,
-                                   use_batchnorm=use_bn, attention_type=attention_type)
+                                   use_batchnorm=use_bn, attention_type=attention_type, use_hypercolumns=use_hypercolumns)
 
         self.logit = nn.Sequential(nn.Conv2d(encoder_chanels[0] * 2, 32, kernel_size=1),
                                    nn.Conv2d(32, num_classes, kernel_size=1))
@@ -154,3 +189,8 @@ class SegmentationUnet(Model):
             return masks, self.logit(x).view(-1)
 
         return masks, 0
+
+
+if __name__ == '__main__':
+    print('Building Unet with Resnet34 backbone...')
+    _ = SegmentationUnet(SETTINGS['resnet34'], num_classes=4, center_block="aspp", aux_clf=True).to(DEVICE)

@@ -4,8 +4,6 @@ from imports import *
 from data.masks import *
 from data.transforms import *
 
-from fastai.vision import *
-
 import pydicom
 
 
