@@ -72,11 +72,12 @@ class CenterBlock(DecoderBlock):
 
 class UnetDecoder(Model):
     def __init__(self, encoder_channels, decoder_channels=(64, 64, 64, 64), final_channels=1,
-                 use_batchnorm=True, attention_type=None, use_hypercolumns=False):
+                 use_batchnorm=True, attention_type=None, use_hypercolumns=False, use_skips=True):
         super().__init__()
         self.use_hypercolumns = use_hypercolumns
+        self.use_skips = use_skips
 
-        in_channels = self.compute_channels(encoder_channels, decoder_channels, use_hypercolumns)
+        in_channels = self.compute_channels(encoder_channels, decoder_channels, use_skips)
         out_channels = decoder_channels
 
         self.layer1 = DecoderBlock(in_channels[0], out_channels[0], use_batchnorm=use_batchnorm,
@@ -89,8 +90,13 @@ class UnetDecoder(Model):
                                    attention_type=attention_type)
 
         global_conv_size = 64
+        if use_hypercolumns:
+            global_conv_input_size = np.sum(out_channels)
+        else:
+            global_conv_input_size = out_channels[-1]
+
         self.global_layer = nn.Sequential(
-            nn.Conv2d(np.sum(out_channels), global_conv_size, kernel_size=1),
+            nn.Conv2d(global_conv_input_size, global_conv_size, kernel_size=1),
             nn.ReLU(),
             nn.BatchNorm2d(global_conv_size),
 
@@ -104,8 +110,8 @@ class UnetDecoder(Model):
         self.initialize()
 
     @staticmethod
-    def compute_channels(encoder_channels, decoder_channels, use_hypercolumns=False):
-        if use_hypercolumns:
+    def compute_channels(encoder_channels, decoder_channels, use_skips=False):
+        if use_skips:
             channels = [
                 encoder_channels[0] + encoder_channels[1],
                 encoder_channels[2] + decoder_channels[0],
@@ -124,7 +130,7 @@ class UnetDecoder(Model):
     def forward(self, x):
         encoder_head = x[0]
 
-        if self.use_hypercolumns:
+        if self.use_skips:
             skips = x[1:]
         else:
             skips = [None, None, None, None]
@@ -135,12 +141,16 @@ class UnetDecoder(Model):
         x4 = self.layer4([x3, skips[3]])
 
         h, w = x4.size()[2:]
-        x = torch.cat([
-            F.upsample_bilinear(x1, size=(h, w)),
-            F.upsample_bilinear(x2, size=(h, w)),
-            F.upsample_bilinear(x3, size=(h, w)),
-            x4
-        ], 1)
+
+        if self.use_hypercolumns:
+            x = torch.cat([
+                F.upsample_bilinear(x1, size=(h, w)),
+                F.upsample_bilinear(x2, size=(h, w)),
+                F.upsample_bilinear(x3, size=(h, w)),
+                x4
+            ], 1)
+        else:
+            x = x4
 
         x = self.global_layer(x)
         x = F.upsample_bilinear(x, size=(2 * h, 2 * w))
