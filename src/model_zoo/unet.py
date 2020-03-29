@@ -179,8 +179,10 @@ class SegmentationUnet(Model):
         self.decoder = UnetDecoder(encoder_channels=encoder_chanels, final_channels=num_classes,
                                    use_batchnorm=use_bn, attention_type=attention_type, use_hypercolumns=use_hypercolumns)
 
-        self.logit = nn.Sequential(nn.Conv2d(encoder_chanels[0] * 2, 32, kernel_size=1),
-                                   nn.Conv2d(32, num_classes, kernel_size=1))
+        self.logit = nn.Sequential(
+            nn.Conv2d(encoder_chanels[0] * 2, 32, kernel_size=1),
+            nn.Conv2d(32, num_classes, kernel_size=1)
+        )
 
     def forward(self, x):
         head, x3, x2, x1, x0 = self.encoder(x)
