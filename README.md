@@ -1,5 +1,9 @@
 # Pneumothorax segmentation
 
+Project for the MVA Deep Learning in Medical Imaging 2019 / 2020 course.
+
+**Authors :** Théo Viel, Mathieu Orhan
+
 ## Install
 
 You should start by cloning the repository:
@@ -27,4 +31,6 @@ unzip siim-train-test.zip -d .
 
 To preprocess the data, simply run the notebook `notebooks/Data Preparation.ipynb`.
 
-## WIP
+## Experiments
+
+To run experiments, use the `Segmentation.ipynb` notebook in the `notebook` directory. The associated code is in the `src` directory. 
